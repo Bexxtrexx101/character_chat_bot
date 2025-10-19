@@ -1,29 +1,51 @@
 import streamlit as st
 import requests
+from bs4 import BeautifulSoup
 
-# UI
-st.title("Character Chatbot")
-notion_url = st.text_input("Paste your Notion character page URL:")
+# Function to scrape basic text from a public Notion page
+def scrape_notion_page(url):
+    try:
+        resp = requests.get(url)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        # Pull out text content—for more structured extraction, refine here
+        contents = ' '.join([el.text for el in soup.find_all(['h1', 'h2', 'h3', 'p', 'li'])])
+        return contents[:2000]  # limit to 2000 chars for speed
+    except Exception as e:
+        return f"Failed to fetch Notion page: {e}"
 
+# Streamlit UI
+st.title("Character Page AI Chatbot")
+
+notion_url = st.text_input("Paste public Notion character page URL:", "")
 if notion_url:
-    # Scrape Notion page content (public pages)
-    page_content = requests.get(notion_url).text  # crude method, refine for rich text extraction
+    notion_content = scrape_notion_page(notion_url)
+    st.write("Character memory found on this page:")
+    st.info(notion_content[:800] + ("..." if len(notion_content) > 800 else ""))  # preview
 
-    # Prompt Engineering
-    character_prompt = f"""
-    You are a fictional character described as follows:
-    [PAGE CONTENT]
-    ---
-    {page_content}
-    ---
-    Respond in this character's voice and context only.
-    """
+    user_input = st.text_input("Ask your character a question:")
 
-    user_input = st.text_input("Ask the character:")
     if user_input:
-        # Send to free AI model, e.g., Hugging Face Inference API
-        api_url = "https://api-inference.huggingface.co/models/gpt2"
-        headers = {"Authorization": "Bearer <YOUR_FREE_HF_TOKEN>"}
-        payload = {"inputs": character_prompt + user_input}
-        response = requests.post(api_url, headers=headers, json=payload)
-        st.write(response.json())
+        # Compose the prompt as if the AI is the character
+        prompt = (
+            "You are a fictional character. Base your answers only on this information:\n"
+            f"{notion_content}\n"
+            f"The user asks: {user_input}\n"
+            "Stay in character!"
+        )
+
+        # Send prompt to Hugging Face free conversational model (DialoGPT)
+        api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
+        headers = {"Authorization": "Bearer <YOUR_HUGGINGFACE_READ_API_TOKEN>"}
+        payload = {"inputs": prompt}
+        result = requests.post(api_url, headers=headers, json=payload)
+
+        # Display response
+        try:
+            if result.status_code == 200:
+                model_reply = result.json()[0]['generated_text']
+            else:
+                model_reply = result.json().get('error', 'API error.')
+        except Exception as e:
+            model_reply = f"Error: {e}"
+        st.success(model_reply)
+
