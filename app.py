@@ -31,7 +31,7 @@ if notion_url:
         )
         api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
         headers = {
-            "Authorization": "Bearer "  # <-- Paste your Hugging Face API token here, e.g. hf_xxxxx
+            "Authorization": f"Bearer {hf_token}"  # <-- Paste your Hugging Face API token here, e.g. hf_xxxxx
         }
         payload = {"inputs": prompt}
         result = requests.post(api_url, headers=headers, json=payload)
